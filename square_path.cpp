@@ -8,15 +8,10 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "motion_msgs/msg/motion_ctrl.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
-#include <fstream>
 
 using namespace std;
 
 #define PI 3.141592653589793238462643383279502884197
-
-// Global file streams for saving data
-ofstream positionFile;
-ofstream imuFile;
 
 class DiabloSquarePathNode : public rclcpp::Node
 {
@@ -116,8 +111,6 @@ double siny_cosp = 2.0 * (qw * qz + qx * qy);
                 RCLCPP_INFO(this->get_logger(), "Moving forward message is published!");
                 RCLCPP_INFO(this->get_logger(), "Current position is: %.2f",local_x);
                 RCLCPP_INFO(this->get_logger(), "Initial position is: %.2f",initial_position);
-                positionFile << "Current Position: " << local_x << "\n" << "Initial Position: " << " " << initial_position << "\n" << "\n";
-
             }
             else
             {
@@ -136,7 +129,6 @@ double siny_cosp = 2.0 * (qw * qz + qx * qy);
             RCLCPP_INFO(this->get_logger(), "Yaw Moved is: %.2f",rotated_yaw);
             RCLCPP_INFO(this->get_logger(), "Initial Yaw is: %.2f",initial_yaw);
             RCLCPP_INFO(this->get_logger(), "Current Yaw is: %.2f",yaw_deg);
-            imuFile << "Initial Yaw: " << initial_yaw << "\n" << "Current Yaw: " << yaw_deg << "\n" << "Change in Yaw: " <<  rotated_yaw << "\n" << "\n";
             if (rotated_yaw <= degree_to_rotate) {
             // Publish rotation command (90 degrees)
             motion_msgs::msg::MotionCtrl cmd;
@@ -187,13 +179,8 @@ int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<DiabloSquarePathNode>();
-    // Initialize file streams
-    positionFile.open("position_readings.txt");
-    imuFile.open("imu_readings.txt");
     rclcpp::spin(node);
     rclcpp::shutdown();
-    positionFile.close();
-    imuFile.close();
     return 0;
 }
 
