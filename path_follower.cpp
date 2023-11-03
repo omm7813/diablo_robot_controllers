@@ -8,6 +8,7 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "motion_msgs/msg/motion_ctrl.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include <vector>
 #include <utility> 
 
@@ -16,19 +17,19 @@ using namespace std;
 class DiabloSquarePathNode : public rclcpp::Node
 {
 public:
-    DiabloSquarePathNode() : Node("p_controller")
+    DiabloSquarePathNode() : Node("path_follower")
     {
         RCLCPP_INFO(this->get_logger(), "Node Started!");
 
-        diablo_pose_subscriber_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/diablo/pose", 10, std::bind(&DiabloSquarePathNode::poseCallback, this, std::placeholders::_1));
+        diablo_pose_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/odometry", 10, std::bind(&DiabloSquarePathNode::poseCallback, this, std::placeholders::_1));
 
         motion_publisher_ = this->create_publisher<motion_msgs::msg::MotionCtrl>(
             "diablo/MotionCmd", 10);
 
         // Initialize control parameters
-        Kv = 0.4;       // Forward gain factor
-        Kw = 0.2;      // Rotation gain factor
+        Kv = 0.5;       // Forward gain factor
+        Kw = 0.4;      // Rotation gain factor
         
         initial_x = 0.0;
         initial_y = 0.0;
@@ -45,13 +46,13 @@ public:
 
 private:
 
-    void poseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+    void poseCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
         // Extract pitch, yaw, and roll from the quaternion orientation
-        double qx = msg->pose.orientation.x;
-        double qy = msg->pose.orientation.y;
-        double qz = msg->pose.orientation.z;
-        double qw = msg->pose.orientation.w;
+        double qx = msg->pose.pose.orientation.x;
+        double qy = msg->pose.pose.orientation.y;
+        double qz = msg->pose.pose.orientation.z;
+        double qw = msg->pose.pose.orientation.w;
 
         //create a variable to store the current yaw reading
         double siny_cosp = 2.0 * (qw * qz + qx * qy);
@@ -59,8 +60,8 @@ private:
         double yaw = atan2(siny_cosp, cosy_cosp);
 
         //Extract position readings
-        double x = msg->pose.position.x;
-        double y = msg->pose.position.y;
+        double x = msg->pose.pose.position.x;
+        double y = msg->pose.pose.position.y;
         x_c = x;
         y_c = y;
         yaw_c = yaw;
@@ -87,7 +88,7 @@ private:
             cmd.mode.stand_mode = true;
             motion_publisher_->publish(cmd);
 
-            path_vector = create_circle_vector(0, 0, 1, num_points);
+            path_vector = create_circle_vector(-0.2, -0.2, 0.4, num_points);
             initialized = true;
         }
 
@@ -104,8 +105,8 @@ private:
         circle_vector.reserve(num_points); // Reserve space for num_points elements
         
         for (int i = 0; i < num_points; ++i) {
-            double x = x_center + radius * std::cos(2 * M_PI * i / num_points) + 5 * std::cos(4 * M_PI * i / num_points);
-            double y = y_center + radius * std::sin(2 * M_PI * i / num_points) + 0.5 * std::sin(4 * M_PI * i / num_points);
+            double x = x_center + radius * std::cos(2 * M_PI * i / num_points);
+            double y = y_center + radius * std::sin(2 * M_PI * i / num_points);
             circle_vector.emplace_back(x, y);
         }
         
@@ -126,6 +127,7 @@ private:
                 }
             }
 
+            
             //calculate the Normal
             double N_x = 0;
             double N_y = 0;
@@ -173,7 +175,7 @@ private:
         motion_publisher_->publish(cmd);
     }
 
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr diablo_pose_subscriber_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr diablo_pose_subscriber_;
     rclcpp::Publisher<motion_msgs::msg::MotionCtrl>::SharedPtr motion_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
     bool  firstMsg;
@@ -183,6 +185,7 @@ private:
     double Kw;
     double x_c, y_c, yaw_c;
     double Dv_y, Dv_x;
+    double target_x, target_y;
     vector<pair<double, double>> path_vector;
     int num_points;
 
